@@ -1,1136 +1,428 @@
-let unpack = require('caniuse-lite/dist/unpacker/feature')
+let AtRule = require('./at-rule')
+let Browsers = require('./browsers')
+let Declaration = require('./declaration')
+let hackAlignContent = require('./hacks/align-content')
+let hackAlignItems = require('./hacks/align-items')
+let hackAlignSelf = require('./hacks/align-self')
+let hackAnimation = require('./hacks/animation')
+let hackAppearance = require('./hacks/appearance')
+let hackAutofill = require('./hacks/autofill')
+let hackBackdropFilter = require('./hacks/backdrop-filter')
+let hackBackgroundClip = require('./hacks/background-clip')
+let hackBackgroundSize = require('./hacks/background-size')
+let hackBlockLogical = require('./hacks/block-logical')
+let hackBorderImage = require('./hacks/border-image')
+let hackBorderRadius = require('./hacks/border-radius')
+let hackBreakProps = require('./hacks/break-props')
+let hackCrossFade = require('./hacks/cross-fade')
+let hackDisplayFlex = require('./hacks/display-flex')
+let hackDisplayGrid = require('./hacks/display-grid')
+let hackFileSelectorButton = require('./hacks/file-selector-button')
+let hackFilter = require('./hacks/filter')
+let hackFilterValue = require('./hacks/filter-value')
+let hackFlex = require('./hacks/flex')
+let hackFlexBasis = require('./hacks/flex-basis')
+let hackFlexDirection = require('./hacks/flex-direction')
+let hackFlexFlow = require('./hacks/flex-flow')
+let hackFlexGrow = require('./hacks/flex-grow')
+let hackFlexShrink = require('./hacks/flex-shrink')
+let hackFlexWrap = require('./hacks/flex-wrap')
+let hackFullscreen = require('./hacks/fullscreen')
+let hackGradient = require('./hacks/gradient')
+let hackGridArea = require('./hacks/grid-area')
+let hackGridColumnAlign = require('./hacks/grid-column-align')
+let hackGridEnd = require('./hacks/grid-end')
+let hackGridRowAlign = require('./hacks/grid-row-align')
+let hackGridRowColumn = require('./hacks/grid-row-column')
+let hackGridRowsColumns = require('./hacks/grid-rows-columns')
+let hackGridStart = require('./hacks/grid-start')
+let hackGridTemplate = require('./hacks/grid-template')
+let hackGridTemplateAreas = require('./hacks/grid-template-areas')
+let hackImageRendering = require('./hacks/image-rendering')
+let hackImageSet = require('./hacks/image-set')
+let hackInlineLogical = require('./hacks/inline-logical')
+let hackIntrinsic = require('./hacks/intrinsic')
+let hackJustifyContent = require('./hacks/justify-content')
+let hackMaskBorder = require('./hacks/mask-border')
+let hackMaskComposite = require('./hacks/mask-composite')
+let hackOrder = require('./hacks/order')
+let hackOverscrollBehavior = require('./hacks/overscroll-behavior')
+let hackPixelated = require('./hacks/pixelated')
+let hackPlaceSelf = require('./hacks/place-self')
+let hackPlaceholder = require('./hacks/placeholder')
+let hackPlaceholderShown = require('./hacks/placeholder-shown')
+let hackPrintColorAdjust = require('./hacks/print-color-adjust')
+let hackTextDecoration = require('./hacks/text-decoration')
+let hackTextDecorationSkipInk = require('./hacks/text-decoration-skip-ink')
+let hackTextEmphasisPosition = require('./hacks/text-emphasis-position')
+let hackTransformDecl = require('./hacks/transform-decl')
+let hackUserSelect = require('./hacks/user-select')
+let hackWritingMode = require('./hacks/writing-mode')
+let Processor = require('./processor')
+let Resolution = require('./resolution')
+let Selector = require('./selector')
+let Supports = require('./supports')
+let Transition = require('./transition')
+let utils = require('./utils')
+let Value = require('./value')
+let vendor = require('./vendor')
 
-function browsersSort(a, b) {
-  a = a.split(' ')
-  b = b.split(' ')
-  if (a[0] > b[0]) {
-    return 1
-  } else if (a[0] < b[0]) {
-    return -1
-  } else {
-    return Math.sign(parseFloat(a[1]) - parseFloat(b[1]))
+Selector.hack(hackAutofill)
+Selector.hack(hackFullscreen)
+Selector.hack(hackPlaceholder)
+Selector.hack(hackPlaceholderShown)
+Selector.hack(hackFileSelectorButton)
+Declaration.hack(hackFlex)
+Declaration.hack(hackOrder)
+Declaration.hack(hackFilter)
+Declaration.hack(hackGridEnd)
+Declaration.hack(hackAnimation)
+Declaration.hack(hackFlexFlow)
+Declaration.hack(hackFlexGrow)
+Declaration.hack(hackFlexWrap)
+Declaration.hack(hackGridArea)
+Declaration.hack(hackPlaceSelf)
+Declaration.hack(hackGridStart)
+Declaration.hack(hackAlignSelf)
+Declaration.hack(hackAppearance)
+Declaration.hack(hackFlexBasis)
+Declaration.hack(hackMaskBorder)
+Declaration.hack(hackMaskComposite)
+Declaration.hack(hackAlignItems)
+Declaration.hack(hackUserSelect)
+Declaration.hack(hackFlexShrink)
+Declaration.hack(hackBreakProps)
+Declaration.hack(hackWritingMode)
+Declaration.hack(hackBorderImage)
+Declaration.hack(hackAlignContent)
+Declaration.hack(hackBorderRadius)
+Declaration.hack(hackBlockLogical)
+Declaration.hack(hackGridTemplate)
+Declaration.hack(hackInlineLogical)
+Declaration.hack(hackGridRowAlign)
+Declaration.hack(hackTransformDecl)
+Declaration.hack(hackFlexDirection)
+Declaration.hack(hackImageRendering)
+Declaration.hack(hackBackdropFilter)
+Declaration.hack(hackBackgroundClip)
+Declaration.hack(hackTextDecoration)
+Declaration.hack(hackJustifyContent)
+Declaration.hack(hackBackgroundSize)
+Declaration.hack(hackGridRowColumn)
+Declaration.hack(hackGridRowsColumns)
+Declaration.hack(hackGridColumnAlign)
+Declaration.hack(hackOverscrollBehavior)
+Declaration.hack(hackGridTemplateAreas)
+Declaration.hack(hackPrintColorAdjust)
+Declaration.hack(hackTextEmphasisPosition)
+Declaration.hack(hackTextDecorationSkipInk)
+Value.hack(hackGradient)
+Value.hack(hackIntrinsic)
+Value.hack(hackPixelated)
+Value.hack(hackImageSet)
+Value.hack(hackCrossFade)
+Value.hack(hackDisplayFlex)
+Value.hack(hackDisplayGrid)
+Value.hack(hackFilterValue)
+
+let declsCache = new Map()
+
+class Prefixes {
+  constructor(data, browsers, options = {}) {
+    this.data = data
+    this.browsers = browsers
+    this.options = options
+    ;[this.add, this.remove] = this.preprocess(this.select(this.data))
+    this.transition = new Transition(this)
+    this.processor = new Processor(this)
   }
-}
 
-// Convert Can I Use data
-function f(data, opts, callback) {
-  data = unpack(data)
+  /**
+   * Return clone instance to remove all prefixes
+   */
+  cleaner() {
+    if (this.cleanerCache) {
+      return this.cleanerCache
+    }
 
-  if (!callback) {
-    ;[callback, opts] = [opts, {}]
+    if (this.browsers.selected.length) {
+      let empty = new Browsers(this.browsers.data, [])
+      this.cleanerCache = new Prefixes(this.data, empty, this.options)
+    } else {
+      return this
+    }
+
+    return this.cleanerCache
   }
 
-  let match = opts.match || /\sx($|\s)/
-  let need = []
+  /**
+   * Declaration loader with caching
+   */
+  decl(prop) {
+    if (!declsCache.has(prop)) {
+      declsCache.set(prop, Declaration.load(prop))
+    }
 
-  for (let browser in data.stats) {
-    let versions = data.stats[browser]
-    for (let version in versions) {
-      let support = versions[version]
-      if (support.match(match)) {
-        need.push(browser + ' ' + version)
+    return declsCache.get(prop)
+  }
+
+  /**
+   * Group declaration by unprefixed property to check them
+   */
+  group(decl) {
+    let rule = decl.parent
+    let index = rule.index(decl)
+    let { length } = rule.nodes
+    let unprefixed = this.unprefixed(decl.prop)
+
+    let checker = (step, callback) => {
+      index += step
+      while (index >= 0 && index < length) {
+        let other = rule.nodes[index]
+        if (other.type === 'decl') {
+          if (step === -1 && other.prop === unprefixed) {
+            if (!Browsers.withPrefix(other.value)) {
+              break
+            }
+          }
+
+          if (this.unprefixed(other.prop) !== unprefixed) {
+            break
+          } else if (callback(other) === true) {
+            return true
+          }
+
+          if (step === +1 && other.prop === unprefixed) {
+            if (!Browsers.withPrefix(other.value)) {
+              break
+            }
+          }
+        }
+
+        index += step
+      }
+      return false
+    }
+
+    return {
+      down(callback) {
+        return checker(+1, callback)
+      },
+      up(callback) {
+        return checker(-1, callback)
       }
     }
   }
 
-  callback(need.sort(browsersSort))
-}
+  /**
+   * Normalize prefix for remover
+   */
+  normalize(prop) {
+    return this.decl(prop).normalize(prop)
+  }
 
-// Add data for all properties
-let result = {}
+  /**
+   * Return prefixed version of property
+   */
+  prefixed(prop, prefix) {
+    prop = vendor.unprefixed(prop)
+    return this.decl(prop).prefixed(prop, prefix)
+  }
 
-function prefix(names, data) {
-  for (let name of names) {
-    result[name] = Object.assign({}, data)
+  /**
+   * Cache prefixes data to fast CSS processing
+   */
+  preprocess(selected) {
+    let add = {
+      '@supports': new Supports(Prefixes, this),
+      'selectors': []
+    }
+    for (let name in selected.add) {
+      let prefixes = selected.add[name]
+      if (name === '@keyframes' || name === '@viewport') {
+        add[name] = new AtRule(name, prefixes, this)
+      } else if (name === '@resolution') {
+        add[name] = new Resolution(name, prefixes, this)
+      } else if (this.data[name].selector) {
+        add.selectors.push(Selector.load(name, prefixes, this))
+      } else {
+        let props = this.data[name].props
+
+        if (props) {
+          let value = Value.load(name, prefixes, this)
+          for (let prop of props) {
+            if (!add[prop]) {
+              add[prop] = { values: [] }
+            }
+            add[prop].values.push(value)
+          }
+        } else {
+          let values = (add[name] && add[name].values) || []
+          add[name] = Declaration.load(name, prefixes, this)
+          add[name].values = values
+        }
+      }
+    }
+
+    let remove = { selectors: [] }
+    for (let name in selected.remove) {
+      let prefixes = selected.remove[name]
+      if (this.data[name].selector) {
+        let selector = Selector.load(name, prefixes)
+        for (let prefix of prefixes) {
+          remove.selectors.push(selector.old(prefix))
+        }
+      } else if (name === '@keyframes' || name === '@viewport') {
+        for (let prefix of prefixes) {
+          let prefixed = `@${prefix}${name.slice(1)}`
+          remove[prefixed] = { remove: true }
+        }
+      } else if (name === '@resolution') {
+        remove[name] = new Resolution(name, prefixes, this)
+      } else {
+        let props = this.data[name].props
+        if (props) {
+          let value = Value.load(name, [], this)
+          for (let prefix of prefixes) {
+            let old = value.old(prefix)
+            if (old) {
+              for (let prop of props) {
+                if (!remove[prop]) {
+                  remove[prop] = {}
+                }
+                if (!remove[prop].values) {
+                  remove[prop].values = []
+                }
+                remove[prop].values.push(old)
+              }
+            }
+          }
+        } else {
+          for (let p of prefixes) {
+            let olds = this.decl(name).old(name, p)
+            if (name === 'align-self') {
+              let a = add[name] && add[name].prefixes
+              if (a) {
+                if (p === '-webkit- 2009' && a.includes('-webkit-')) {
+                  continue
+                } else if (p === '-webkit-' && a.includes('-webkit- 2009')) {
+                  continue
+                }
+              }
+            }
+            for (let prefixed of olds) {
+              if (!remove[prefixed]) {
+                remove[prefixed] = {}
+              }
+              remove[prefixed].remove = true
+            }
+          }
+        }
+      }
+    }
+
+    return [add, remove]
+  }
+
+  /**
+   * Select prefixes from data, which is necessary for selected browsers
+   */
+  select(list) {
+    let selected = { add: {}, remove: {} }
+
+    for (let name in list) {
+      let data = list[name]
+      let add = data.browsers.map(i => {
+        let params = i.split(' ')
+        return {
+          browser: `${params[0]} ${params[1]}`,
+          note: params[2]
+        }
+      })
+
+      let notes = add
+        .filter(i => i.note)
+        .map(i => `${this.browsers.prefix(i.browser)} ${i.note}`)
+      notes = utils.uniq(notes)
+
+      add = add
+        .filter(i => this.browsers.isSelected(i.browser))
+        .map(i => {
+          let prefix = this.browsers.prefix(i.browser)
+          if (i.note) {
+            return `${prefix} ${i.note}`
+          } else {
+            return prefix
+          }
+        })
+      add = this.sort(utils.uniq(add))
+
+      if (this.options.flexbox === 'no-2009') {
+        add = add.filter(i => !i.includes('2009'))
+      }
+
+      let all = data.browsers.map(i => this.browsers.prefix(i))
+      if (data.mistakes) {
+        all = all.concat(data.mistakes)
+      }
+      all = all.concat(notes)
+      all = utils.uniq(all)
+
+      if (add.length) {
+        selected.add[name] = add
+        if (add.length < all.length) {
+          selected.remove[name] = all.filter(i => !add.includes(i))
+        }
+      } else {
+        selected.remove[name] = all
+      }
+    }
+
+    return selected
+  }
+
+  /**
+   * Sort vendor prefixes
+   */
+  sort(prefixes) {
+    return prefixes.sort((a, b) => {
+      let aLength = utils.removeNote(a).length
+      let bLength = utils.removeNote(b).length
+
+      if (aLength === bLength) {
+        return b.length - a.length
+      } else {
+        return bLength - aLength
+      }
+    })
+  }
+
+  /**
+   * Return unprefixed version of property
+   */
+  unprefixed(prop) {
+    let value = this.normalize(vendor.unprefixed(prop))
+    if (value === 'flex-direction') {
+      value = 'flex-flow'
+    }
+    return value
+  }
+
+  /**
+   * Return values, which must be prefixed in selected property
+   */
+  values(type, prop) {
+    let data = this[type]
+
+    let global = data['*'] && data['*'].values
+    let values = data[prop] && data[prop].values
+
+    if (global && values) {
+      return utils.uniq(global.concat(values))
+    } else {
+      return global || values || []
+    }
   }
 }
 
-function add(names, data) {
-  for (let name of names) {
-    result[name].browsers = result[name].browsers
-      .concat(data.browsers)
-      .sort(browsersSort)
-  }
-}
-
-module.exports = result
-
-// Border Radius
-let prefixBorderRadius = require('caniuse-lite/data/features/border-radius')
-
-f(prefixBorderRadius, browsers =>
-  prefix(
-    [
-      'border-radius',
-      'border-top-left-radius',
-      'border-top-right-radius',
-      'border-bottom-right-radius',
-      'border-bottom-left-radius'
-    ],
-    {
-      browsers,
-      feature: 'border-radius',
-      mistakes: ['-khtml-', '-ms-', '-o-']
-    }
-  )
-)
-
-// Box Shadow
-let prefixBoxshadow = require('caniuse-lite/data/features/css-boxshadow')
-
-f(prefixBoxshadow, browsers =>
-  prefix(['box-shadow'], {
-    browsers,
-    feature: 'css-boxshadow',
-    mistakes: ['-khtml-']
-  })
-)
-
-// Animation
-let prefixAnimation = require('caniuse-lite/data/features/css-animation')
-
-f(prefixAnimation, browsers =>
-  prefix(
-    [
-      'animation',
-      'animation-name',
-      'animation-duration',
-      'animation-delay',
-      'animation-direction',
-      'animation-fill-mode',
-      'animation-iteration-count',
-      'animation-play-state',
-      'animation-timing-function',
-      '@keyframes'
-    ],
-    {
-      browsers,
-      feature: 'css-animation',
-      mistakes: ['-khtml-', '-ms-']
-    }
-  )
-)
-
-// Transition
-let prefixTransition = require('caniuse-lite/data/features/css-transitions')
-
-f(prefixTransition, browsers =>
-  prefix(
-    [
-      'transition',
-      'transition-property',
-      'transition-duration',
-      'transition-delay',
-      'transition-timing-function'
-    ],
-    {
-      browsers,
-      feature: 'css-transitions',
-      mistakes: ['-khtml-', '-ms-']
-    }
-  )
-)
-
-// Transform 2D
-let prefixTransform2d = require('caniuse-lite/data/features/transforms2d')
-
-f(prefixTransform2d, browsers =>
-  prefix(['transform', 'transform-origin'], {
-    browsers,
-    feature: 'transforms2d'
-  })
-)
-
-// Transform 3D
-let prefixTransforms3d = require('caniuse-lite/data/features/transforms3d')
-
-f(prefixTransforms3d, browsers => {
-  prefix(['perspective', 'perspective-origin'], {
-    browsers,
-    feature: 'transforms3d'
-  })
-  return prefix(['transform-style'], {
-    browsers,
-    feature: 'transforms3d',
-    mistakes: ['-ms-', '-o-']
-  })
-})
-
-f(prefixTransforms3d, { match: /y\sx|y\s#2/ }, browsers =>
-  prefix(['backface-visibility'], {
-    browsers,
-    feature: 'transforms3d',
-    mistakes: ['-ms-', '-o-']
-  })
-)
-
-// Gradients
-let prefixGradients = require('caniuse-lite/data/features/css-gradients')
-
-f(prefixGradients, { match: /y\sx/ }, browsers =>
-  prefix(
-    [
-      'linear-gradient',
-      'repeating-linear-gradient',
-      'radial-gradient',
-      'repeating-radial-gradient'
-    ],
-    {
-      browsers,
-      feature: 'css-gradients',
-      mistakes: ['-ms-'],
-      props: [
-        'background',
-        'background-image',
-        'border-image',
-        'mask',
-        'list-style',
-        'list-style-image',
-        'content',
-        'mask-image'
-      ]
-    }
-  )
-)
-
-f(prefixGradients, { match: /a\sx/ }, browsers => {
-  browsers = browsers.map(i => {
-    if (/firefox|op/.test(i)) {
-      return i
-    } else {
-      return `${i} old`
-    }
-  })
-  return add(
-    [
-      'linear-gradient',
-      'repeating-linear-gradient',
-      'radial-gradient',
-      'repeating-radial-gradient'
-    ],
-    {
-      browsers,
-      feature: 'css-gradients'
-    }
-  )
-})
-
-// Box sizing
-let prefixBoxsizing = require('caniuse-lite/data/features/css3-boxsizing')
-
-f(prefixBoxsizing, browsers =>
-  prefix(['box-sizing'], {
-    browsers,
-    feature: 'css3-boxsizing'
-  })
-)
-
-// Filter Effects
-let prefixFilters = require('caniuse-lite/data/features/css-filters')
-
-f(prefixFilters, browsers =>
-  prefix(['filter'], {
-    browsers,
-    feature: 'css-filters'
-  })
-)
-
-// filter() function
-let prefixFilterFunction = require('caniuse-lite/data/features/css-filter-function')
-
-f(prefixFilterFunction, browsers =>
-  prefix(['filter-function'], {
-    browsers,
-    feature: 'css-filter-function',
-    props: [
-      'background',
-      'background-image',
-      'border-image',
-      'mask',
-      'list-style',
-      'list-style-image',
-      'content',
-      'mask-image'
-    ]
-  })
-)
-
-// Backdrop-filter
-let prefixBackdropFilter = require('caniuse-lite/data/features/css-backdrop-filter')
-
-f(prefixBackdropFilter, { match: /y\sx|y\s#2/ }, browsers =>
-  prefix(['backdrop-filter'], {
-    browsers,
-    feature: 'css-backdrop-filter'
-  })
-)
-
-// element() function
-let prefixElementFunction = require('caniuse-lite/data/features/css-element-function')
-
-f(prefixElementFunction, browsers =>
-  prefix(['element'], {
-    browsers,
-    feature: 'css-element-function',
-    props: [
-      'background',
-      'background-image',
-      'border-image',
-      'mask',
-      'list-style',
-      'list-style-image',
-      'content',
-      'mask-image'
-    ]
-  })
-)
-
-// Multicolumns
-let prefixMulticolumns = require('caniuse-lite/data/features/multicolumn')
-
-f(prefixMulticolumns, browsers => {
-  prefix(
-    [
-      'columns',
-      'column-width',
-      'column-gap',
-      'column-rule',
-      'column-rule-color',
-      'column-rule-width',
-      'column-count',
-      'column-rule-style',
-      'column-span',
-      'column-fill'
-    ],
-    {
-      browsers,
-      feature: 'multicolumn'
-    }
-  )
-
-  let noff = browsers.filter(i => !/firefox/.test(i))
-  prefix(['break-before', 'break-after', 'break-inside'], {
-    browsers: noff,
-    feature: 'multicolumn'
-  })
-})
-
-// User select
-let prefixUserSelect = require('caniuse-lite/data/features/user-select-none')
-
-f(prefixUserSelect, browsers =>
-  prefix(['user-select'], {
-    browsers,
-    feature: 'user-select-none',
-    mistakes: ['-khtml-']
-  })
-)
-
-// Flexible Box Layout
-let prefixFlexbox = require('caniuse-lite/data/features/flexbox')
-
-f(prefixFlexbox, { match: /a\sx/ }, browsers => {
-  browsers = browsers.map(i => {
-    if (/ie|firefox/.test(i)) {
-      return i
-    } else {
-      return `${i} 2009`
-    }
-  })
-  prefix(['display-flex', 'inline-flex'], {
-    browsers,
-    feature: 'flexbox',
-    props: ['display']
-  })
-  prefix(['flex', 'flex-grow', 'flex-shrink', 'flex-basis'], {
-    browsers,
-    feature: 'flexbox'
-  })
-  prefix(
-    [
-      'flex-direction',
-      'flex-wrap',
-      'flex-flow',
-      'justify-content',
-      'order',
-      'align-items',
-      'align-self',
-      'align-content'
-    ],
-    {
-      browsers,
-      feature: 'flexbox'
-    }
-  )
-})
-
-f(prefixFlexbox, { match: /y\sx/ }, browsers => {
-  add(['display-flex', 'inline-flex'], {
-    browsers,
-    feature: 'flexbox'
-  })
-  add(['flex', 'flex-grow', 'flex-shrink', 'flex-basis'], {
-    browsers,
-    feature: 'flexbox'
-  })
-  add(
-    [
-      'flex-direction',
-      'flex-wrap',
-      'flex-flow',
-      'justify-content',
-      'order',
-      'align-items',
-      'align-self',
-      'align-content'
-    ],
-    {
-      browsers,
-      feature: 'flexbox'
-    }
-  )
-})
-
-// calc() unit
-let prefixCalc = require('caniuse-lite/data/features/calc')
-
-f(prefixCalc, browsers =>
-  prefix(['calc'], {
-    browsers,
-    feature: 'calc',
-    props: ['*']
-  })
-)
-
-// Background options
-let prefixBackgroundOptions = require('caniuse-lite/data/features/background-img-opts')
-
-f(prefixBackgroundOptions, browsers =>
-  prefix(['background-origin', 'background-size'], {
-    browsers,
-    feature: 'background-img-opts'
-  })
-)
-
-// background-clip: text
-let prefixBackgroundClipText = require('caniuse-lite/data/features/background-clip-text')
-
-f(prefixBackgroundClipText, browsers =>
-  prefix(['background-clip'], {
-    browsers,
-    feature: 'background-clip-text'
-  })
-)
-
-// Font feature settings
-let prefixFontFeature = require('caniuse-lite/data/features/font-feature')
-
-f(prefixFontFeature, browsers =>
-  prefix(
-    [
-      'font-feature-settings',
-      'font-variant-ligatures',
-      'font-language-override'
-    ],
-    {
-      browsers,
-      feature: 'font-feature'
-    }
-  )
-)
-
-// CSS font-kerning property
-let prefixFontKerning = require('caniuse-lite/data/features/font-kerning')
-
-f(prefixFontKerning, browsers =>
-  prefix(['font-kerning'], {
-    browsers,
-    feature: 'font-kerning'
-  })
-)
-
-// Border image
-let prefixBorderImage = require('caniuse-lite/data/features/border-image')
-
-f(prefixBorderImage, browsers =>
-  prefix(['border-image'], {
-    browsers,
-    feature: 'border-image'
-  })
-)
-
-// Selection selector
-let prefixSelection = require('caniuse-lite/data/features/css-selection')
-
-f(prefixSelection, browsers =>
-  prefix(['::selection'], {
-    browsers,
-    feature: 'css-selection',
-    selector: true
-  })
-)
-
-// Placeholder selector
-let prefixPlaceholder = require('caniuse-lite/data/features/css-placeholder')
-
-f(prefixPlaceholder, browsers => {
-  prefix(['::placeholder'], {
-    browsers: browsers.concat(['ie 10 old', 'ie 11 old', 'firefox 18 old']),
-    feature: 'css-placeholder',
-    selector: true
-  })
-})
-
-// Placeholder-shown selector
-let prefixPlaceholderShown = require('caniuse-lite/data/features/css-placeholder-shown')
-
-f(prefixPlaceholderShown, browsers => {
-  prefix([':placeholder-shown'], {
-    browsers,
-    feature: 'css-placeholder-shown',
-    selector: true
-  })
-})
-
-// Hyphenation
-let prefixHyphens = require('caniuse-lite/data/features/css-hyphens')
-
-f(prefixHyphens, browsers =>
-  prefix(['hyphens'], {
-    browsers,
-    feature: 'css-hyphens'
-  })
-)
-
-// Fullscreen selector
-let prefixFullscreen = require('caniuse-lite/data/features/fullscreen')
-
-f(prefixFullscreen, browsers =>
-  prefix([':fullscreen'], {
-    browsers,
-    feature: 'fullscreen',
-    selector: true
-  })
-)
-
-// ::backdrop pseudo-element
-// https://caniuse.com/mdn-css_selectors_backdrop
-let prefixBackdrop = require('caniuse-lite/data/features/mdn-css-backdrop-pseudo-element')
-
-f(prefixBackdrop, browsers =>
-  prefix(['::backdrop'], {
-    browsers,
-    feature: 'backdrop',
-    selector: true
-  })
-)
-
-// File selector button
-let prefixFileSelectorButton = require('caniuse-lite/data/features/css-file-selector-button')
-
-f(prefixFileSelectorButton, browsers =>
-  prefix(['::file-selector-button'], {
-    browsers,
-    feature: 'file-selector-button',
-    selector: true
-  })
-)
-
-// :autofill
-let prefixAutofill = require('caniuse-lite/data/features/css-autofill')
-
-f(prefixAutofill, browsers =>
-  prefix([':autofill'], {
-    browsers,
-    feature: 'css-autofill',
-    selector: true
-  })
-)
-
-// Tab size
-let prefixTabsize = require('caniuse-lite/data/features/css3-tabsize')
-
-f(prefixTabsize, browsers =>
-  prefix(['tab-size'], {
-    browsers,
-    feature: 'css3-tabsize'
-  })
-)
-
-// Intrinsic & extrinsic sizing
-let prefixIntrinsic = require('caniuse-lite/data/features/intrinsic-width')
-
-let sizeProps = [
-  'width',
-  'min-width',
-  'max-width',
-  'height',
-  'min-height',
-  'max-height',
-  'inline-size',
-  'min-inline-size',
-  'max-inline-size',
-  'block-size',
-  'min-block-size',
-  'max-block-size',
-  'grid',
-  'grid-template',
-  'grid-template-rows',
-  'grid-template-columns',
-  'grid-auto-columns',
-  'grid-auto-rows'
-]
-
-f(prefixIntrinsic, browsers =>
-  prefix(['max-content', 'min-content'], {
-    browsers,
-    feature: 'intrinsic-width',
-    props: sizeProps
-  })
-)
-
-f(prefixIntrinsic, { match: /x|\s#4/ }, browsers =>
-  prefix(['fill', 'fill-available'], {
-    browsers,
-    feature: 'intrinsic-width',
-    props: sizeProps
-  })
-)
-
-f(prefixIntrinsic, { match: /x|\s#5/ }, browsers => {
-  let ffFix = browsers.filter(i => {
-    let [name, version] = i.split(' ')
-    if (name === 'firefox' || name === 'and_ff') {
-      return parseInt(version) < 94
-    } else {
-      return true
-    }
-  })
-  return prefix(['fit-content'], {
-    browsers: ffFix,
-    feature: 'intrinsic-width',
-    props: sizeProps
-  })
-})
-
-// Stretch value
-
-let prefixStretch = require('caniuse-lite/data/features/css-width-stretch')
-
-f(prefixStretch, browsers =>
-  prefix(['stretch'], {
-    browsers,
-    feature: 'css-width-stretch',
-    props: sizeProps
-  })
-)
-
-// Zoom cursors
-let prefixCursorsNewer = require('caniuse-lite/data/features/css3-cursors-newer')
-
-f(prefixCursorsNewer, browsers =>
-  prefix(['zoom-in', 'zoom-out'], {
-    browsers,
-    feature: 'css3-cursors-newer',
-    props: ['cursor']
-  })
-)
-
-// Grab cursors
-let prefixCursorsGrab = require('caniuse-lite/data/features/css3-cursors-grab')
-
-f(prefixCursorsGrab, browsers =>
-  prefix(['grab', 'grabbing'], {
-    browsers,
-    feature: 'css3-cursors-grab',
-    props: ['cursor']
-  })
-)
-
-// Sticky position
-let prefixSticky = require('caniuse-lite/data/features/css-sticky')
-
-f(prefixSticky, browsers =>
-  prefix(['sticky'], {
-    browsers,
-    feature: 'css-sticky',
-    props: ['position']
-  })
-)
-
-// Pointer Events
-let prefixPointer = require('caniuse-lite/data/features/pointer')
-
-f(prefixPointer, browsers =>
-  prefix(['touch-action'], {
-    browsers,
-    feature: 'pointer'
-  })
-)
-
-// Text decoration
-let prefixDecoration = require('caniuse-lite/data/features/text-decoration')
-
-f(prefixDecoration, { match: /x.*#[235]/ }, browsers =>
-  prefix(['text-decoration-skip', 'text-decoration-skip-ink'], {
-    browsers,
-    feature: 'text-decoration'
-  })
-)
-
-let prefixDecorationShorthand = require('caniuse-lite/data/features/mdn-text-decoration-shorthand')
-
-f(prefixDecorationShorthand, browsers =>
-  prefix(['text-decoration'], {
-    browsers,
-    feature: 'text-decoration'
-  })
-)
-
-let prefixDecorationColor = require('caniuse-lite/data/features/mdn-text-decoration-color')
-
-f(prefixDecorationColor, browsers =>
-  prefix(['text-decoration-color'], {
-    browsers,
-    feature: 'text-decoration'
-  })
-)
-
-let prefixDecorationLine = require('caniuse-lite/data/features/mdn-text-decoration-line')
-
-f(prefixDecorationLine, browsers =>
-  prefix(['text-decoration-line'], {
-    browsers,
-    feature: 'text-decoration'
-  })
-)
-
-let prefixDecorationStyle = require('caniuse-lite/data/features/mdn-text-decoration-style')
-
-f(prefixDecorationStyle, browsers =>
-  prefix(['text-decoration-style'], {
-    browsers,
-    feature: 'text-decoration'
-  })
-)
-
-// Text Size Adjust
-let prefixTextSizeAdjust = require('caniuse-lite/data/features/text-size-adjust')
-
-f(prefixTextSizeAdjust, browsers =>
-  prefix(['text-size-adjust'], {
-    browsers,
-    feature: 'text-size-adjust'
-  })
-)
-
-// CSS Masks
-let prefixCssMasks = require('caniuse-lite/data/features/css-masks')
-
-f(prefixCssMasks, browsers => {
-  prefix(
-    [
-      'mask-clip',
-      'mask-composite',
-      'mask-image',
-      'mask-origin',
-      'mask-repeat',
-      'mask-border-repeat',
-      'mask-border-source'
-    ],
-    {
-      browsers,
-      feature: 'css-masks'
-    }
-  )
-  prefix(
-    [
-      'mask',
-      'mask-position',
-      'mask-size',
-      'mask-border',
-      'mask-border-outset',
-      'mask-border-width',
-      'mask-border-slice'
-    ],
-    {
-      browsers,
-      feature: 'css-masks'
-    }
-  )
-})
-
-// CSS clip-path property
-let prefixClipPath = require('caniuse-lite/data/features/css-clip-path')
-
-f(prefixClipPath, browsers =>
-  prefix(['clip-path'], {
-    browsers,
-    feature: 'css-clip-path'
-  })
-)
-
-// Fragmented Borders and Backgrounds
-let prefixBoxdecoration = require('caniuse-lite/data/features/css-boxdecorationbreak')
-
-f(prefixBoxdecoration, browsers =>
-  prefix(['box-decoration-break'], {
-    browsers,
-    feature: 'css-boxdecorationbreak'
-  })
-)
-
-// CSS3 object-fit/object-position
-let prefixObjectFit = require('caniuse-lite/data/features/object-fit')
-
-f(prefixObjectFit, browsers =>
-  prefix(['object-fit', 'object-position'], {
-    browsers,
-    feature: 'object-fit'
-  })
-)
-
-// CSS Shapes
-let prefixShapes = require('caniuse-lite/data/features/css-shapes')
-
-f(prefixShapes, browsers =>
-  prefix(['shape-margin', 'shape-outside', 'shape-image-threshold'], {
-    browsers,
-    feature: 'css-shapes'
-  })
-)
-
-// CSS3 text-overflow
-let prefixTextOverflow = require('caniuse-lite/data/features/text-overflow')
-
-f(prefixTextOverflow, browsers =>
-  prefix(['text-overflow'], {
-    browsers,
-    feature: 'text-overflow'
-  })
-)
-
-// Viewport at-rule
-let prefixDeviceadaptation = require('caniuse-lite/data/features/css-deviceadaptation')
-
-f(prefixDeviceadaptation, browsers =>
-  prefix(['@viewport'], {
-    browsers,
-    feature: 'css-deviceadaptation'
-  })
-)
-
-// Resolution Media Queries
-let prefixResolut = require('caniuse-lite/data/features/css-media-resolution')
-
-f(prefixResolut, { match: /( x($| )|a #2)/ }, browsers =>
-  prefix(['@resolution'], {
-    browsers,
-    feature: 'css-media-resolution'
-  })
-)
-
-// CSS text-align-last
-let prefixTextAlignLast = require('caniuse-lite/data/features/css-text-align-last')
-
-f(prefixTextAlignLast, browsers =>
-  prefix(['text-align-last'], {
-    browsers,
-    feature: 'css-text-align-last'
-  })
-)
-
-// Crisp Edges Image Rendering Algorithm
-let prefixCrispedges = require('caniuse-lite/data/features/css-crisp-edges')
-
-f(prefixCrispedges, { match: /y x|a x #1/ }, browsers =>
-  prefix(['pixelated'], {
-    browsers,
-    feature: 'css-crisp-edges',
-    props: ['image-rendering']
-  })
-)
-
-f(prefixCrispedges, { match: /a x #2/ }, browsers =>
-  prefix(['image-rendering'], {
-    browsers,
-    feature: 'css-crisp-edges'
-  })
-)
-
-// Logical Properties
-let prefixLogicalProps = require('caniuse-lite/data/features/css-logical-props')
-
-f(prefixLogicalProps, browsers =>
-  prefix(
-    [
-      'border-inline-start',
-      'border-inline-end',
-      'margin-inline-start',
-      'margin-inline-end',
-      'padding-inline-start',
-      'padding-inline-end'
-    ],
-    {
-      browsers,
-      feature: 'css-logical-props'
-    }
-  )
-)
-
-f(prefixLogicalProps, { match: /x\s#2/ }, browsers =>
-  prefix(
-    [
-      'border-block-start',
-      'border-block-end',
-      'margin-block-start',
-      'margin-block-end',
-      'padding-block-start',
-      'padding-block-end'
-    ],
-    {
-      browsers,
-      feature: 'css-logical-props'
-    }
-  )
-)
-
-// CSS appearance
-let prefixAppearance = require('caniuse-lite/data/features/css-appearance')
-
-f(prefixAppearance, { match: /#2|x/ }, browsers =>
-  prefix(['appearance'], {
-    browsers,
-    feature: 'css-appearance'
-  })
-)
-
-// CSS Scroll snap points
-let prefixSnappoints = require('caniuse-lite/data/features/css-snappoints')
-
-f(prefixSnappoints, browsers =>
-  prefix(
-    [
-      'scroll-snap-type',
-      'scroll-snap-coordinate',
-      'scroll-snap-destination',
-      'scroll-snap-points-x',
-      'scroll-snap-points-y'
-    ],
-    {
-      browsers,
-      feature: 'css-snappoints'
-    }
-  )
-)
-
-// CSS Regions
-let prefixRegions = require('caniuse-lite/data/features/css-regions')
-
-f(prefixRegions, browsers =>
-  prefix(['flow-into', 'flow-from', 'region-fragment'], {
-    browsers,
-    feature: 'css-regions'
-  })
-)
-
-// CSS image-set
-let prefixImageSet = require('caniuse-lite/data/features/css-image-set')
-
-f(prefixImageSet, browsers =>
-  prefix(['image-set'], {
-    browsers,
-    feature: 'css-image-set',
-    props: [
-      'background',
-      'background-image',
-      'border-image',
-      'cursor',
-      'mask',
-      'mask-image',
-      'list-style',
-      'list-style-image',
-      'content'
-    ]
-  })
-)
-
-// Writing Mode
-let prefixWritingMode = require('caniuse-lite/data/features/css-writing-mode')
-
-f(prefixWritingMode, { match: /a|x/ }, browsers =>
-  prefix(['writing-mode'], {
-    browsers,
-    feature: 'css-writing-mode'
-  })
-)
-
-// Cross-Fade Function
-let prefixCrossFade = require('caniuse-lite/data/features/css-cross-fade')
-
-f(prefixCrossFade, browsers =>
-  prefix(['cross-fade'], {
-    browsers,
-    feature: 'css-cross-fade',
-    props: [
-      'background',
-      'background-image',
-      'border-image',
-      'mask',
-      'list-style',
-      'list-style-image',
-      'content',
-      'mask-image'
-    ]
-  })
-)
-
-// Read Only selector
-let prefixReadOnly = require('caniuse-lite/data/features/css-read-only-write')
-
-f(prefixReadOnly, browsers =>
-  prefix([':read-only', ':read-write'], {
-    browsers,
-    feature: 'css-read-only-write',
-    selector: true
-  })
-)
-
-// Text Emphasize
-let prefixTextEmphasis = require('caniuse-lite/data/features/text-emphasis')
-
-f(prefixTextEmphasis, browsers =>
-  prefix(
-    [
-      'text-emphasis',
-      'text-emphasis-position',
-      'text-emphasis-style',
-      'text-emphasis-color'
-    ],
-    {
-      browsers,
-      feature: 'text-emphasis'
-    }
-  )
-)
-
-// CSS Grid Layout
-let prefixGrid = require('caniuse-lite/data/features/css-grid')
-
-f(prefixGrid, browsers => {
-  prefix(['display-grid', 'inline-grid'], {
-    browsers,
-    feature: 'css-grid',
-    props: ['display']
-  })
-  prefix(
-    [
-      'grid-template-columns',
-      'grid-template-rows',
-      'grid-row-start',
-      'grid-column-start',
-      'grid-row-end',
-      'grid-column-end',
-      'grid-row',
-      'grid-column',
-      'grid-area',
-      'grid-template',
-      'grid-template-areas',
-      'place-self'
-    ],
-    {
-      browsers,
-      feature: 'css-grid'
-    }
-  )
-})
-
-f(prefixGrid, { match: /a x/ }, browsers =>
-  prefix(['grid-column-align', 'grid-row-align'], {
-    browsers,
-    feature: 'css-grid'
-  })
-)
-
-// CSS text-spacing
-let prefixTextSpacing = require('caniuse-lite/data/features/css-text-spacing')
-
-f(prefixTextSpacing, browsers =>
-  prefix(['text-spacing'], {
-    browsers,
-    feature: 'css-text-spacing'
-  })
-)
-
-// :any-link selector
-let prefixAnyLink = require('caniuse-lite/data/features/css-any-link')
-
-f(prefixAnyLink, browsers =>
-  prefix([':any-link'], {
-    browsers,
-    feature: 'css-any-link',
-    selector: true
-  })
-)
-
-// unicode-bidi
-
-let bidiIsolate = require('caniuse-lite/data/features/mdn-css-unicode-bidi-isolate')
-
-f(bidiIsolate, browsers =>
-  prefix(['isolate'], {
-    browsers,
-    feature: 'css-unicode-bidi',
-    props: ['unicode-bidi']
-  })
-)
-
-let bidiPlaintext = require('caniuse-lite/data/features/mdn-css-unicode-bidi-plaintext')
-
-f(bidiPlaintext, browsers =>
-  prefix(['plaintext'], {
-    browsers,
-    feature: 'css-unicode-bidi',
-    props: ['unicode-bidi']
-  })
-)
-
-let bidiOverride = require('caniuse-lite/data/features/mdn-css-unicode-bidi-isolate-override')
-
-f(bidiOverride, { match: /y x/ }, browsers =>
-  prefix(['isolate-override'], {
-    browsers,
-    feature: 'css-unicode-bidi',
-    props: ['unicode-bidi']
-  })
-)
-
-// overscroll-behavior selector
-let prefixOverscroll = require('caniuse-lite/data/features/css-overscroll-behavior')
-
-f(prefixOverscroll, { match: /a #1/ }, browsers =>
-  prefix(['overscroll-behavior'], {
-    browsers,
-    feature: 'css-overscroll-behavior'
-  })
-)
-
-// text-orientation
-let prefixTextOrientation = require('caniuse-lite/data/features/css-text-orientation')
-
-f(prefixTextOrientation, browsers =>
-  prefix(['text-orientation'], {
-    browsers,
-    feature: 'css-text-orientation'
-  })
-)
-
-// print-color-adjust
-let prefixPrintAdjust = require('caniuse-lite/data/features/css-print-color-adjust')
-
-f(prefixPrintAdjust, browsers =>
-  prefix(['print-color-adjust', 'color-adjust'], {
-    browsers,
-    feature: 'css-print-color-adjust'
-  })
-)
+module.exports = Prefixes

@@ -1,6 +1,7 @@
-module.exports =
-{
-  parallel      : require('./parallel.js'),
-  serial        : require('./serial.js'),
-  serialOrdered : require('./serialOrdered.js')
-};
+import platform from './node/index.js';
+import * as utils from './common/utils.js';
+
+export default {
+  ...utils,
+  ...platform
+}
